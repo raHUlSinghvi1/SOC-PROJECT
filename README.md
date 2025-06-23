@@ -10,8 +10,8 @@ What I Have Learned So Far:
 
 5. Worked on building a trading strategy using:
 
- Relative Strength Index (RSI)
- Moving Average crossover
+ Relative Strength Index (RSI) and 
+  Moving Average crossover
 
 6. Gained basic understanding of backtesting a strategy to check historical performance.
 
