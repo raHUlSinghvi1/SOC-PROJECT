@@ -1,0 +1,165 @@
+import sys
+import os
+import yfinance as yf
+import numpy as np
+import pandas as pd
+import talib
+import matplotlib.pyplot as plt
+
+
+# Local RSI module
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import rsi  # assumes you have rsi.py file with computeRSI() and generateSignals()
+
+# === FETCH DATA ===
+data = yf.download("TATAMOTORS.NS", period="60d", interval="15m", auto_adjust=False)
+data.index = data.index.tz_localize(None)
+
+prices = data['Close'].squeeze()
+
+# === RSI CALCULATION ===
+rsi_values = rsi.computeRSI(prices.tolist(), 14)
+rsi_signals = rsi.generateSignals(rsi_values)
+
+# === EMA STRATEGY (NEW) ===
+ema_50 = talib.EMA(prices.values, timeperiod=50)
+ema_200 = talib.EMA(prices.values, timeperiod=200)
+
+ema_signals = []
+for i in range(len(prices)):
+    if np.isnan(ema_50[i]) or np.isnan(ema_200[i]):
+        ema_signals.append("None")
+    elif ema_50[i] > ema_200[i]:
+        ema_signals.append("Buy")
+    elif ema_50[i] < ema_200[i]:
+        ema_signals.append("Sell")
+    else:
+        ema_signals.append("Hold")
+
+
+
+
+
+
+combined_signals = []
+for i in range(len(prices)):
+    price = prices[i]
+    rsi_val = rsi_values[i]
+    ema50 = ema_50[i]
+    ema200 = ema_200[i]
+
+    if np.isnan(ema50) or np.isnan(ema200) or np.isnan(rsi_val):
+        combined_signals.append("Hold")
+        continue
+
+    # === 1. RSI Strategy ===
+    if rsi_val < 20:
+        combined_signals.append("Buy")
+    # elif rsi_val > 80:
+    #     combined_signals.append("Sell")
+
+    # === 2. New Price-vs-EMA200 Strategy ===
+    else:
+        diff_pct_price_ema200 = abs(price - ema200) / ema200 * 100
+
+        if price > ema200 and diff_pct_price_ema200 > 5.5:
+            combined_signals.append("Sell")
+        elif price < ema200 and diff_pct_price_ema200 > 4:
+            combined_signals.append("Buy")
+
+        # === 3. Original EMA Logic (UNTOUCHED) ===
+        elif ema50 > ema200 and abs(ema50 - ema200) / ema200 * 100 >= 1:
+            combined_signals.append("Buy")
+        # elif ema50 < ema200 and abs(ema50 - ema200) / ema200 * 100 >= 4:
+        #     combined_signals.append("Sell")
+        else:
+            combined_signals.append("Hold")
+
+
+
+# === PRINT TABLE ===
+print(f"{'Date':<20} {'Close':<10} {'RSI':<8} {'RSI Sig':<8} {'EMA Sig':<8} {'Combined'}")
+print("-" * 70)
+for i in range(len(prices)):
+    print(f"{data.index[i].strftime('%Y-%m-%d %H:%M'):<20} {prices[i]:<10.2f} {rsi_values[i]:<8.2f} {rsi_signals[i]:<8} {ema_signals[i]:<8} ")
+# {combined_signals[i]}
+# === BACKTEST ON COMBINED SIGNALS ===
+trades = []
+in_position = False
+entry_price = 0
+entry_date = ""
+
+for i in range(len(combined_signals)):
+    signal = combined_signals[i]
+    price = prices[i]
+    date = data.index[i]
+
+    if signal == "Buy" and not in_position:
+        entry_price = price
+        entry_date = date
+        in_position = True
+
+    elif signal == "Sell" and in_position:
+        exit_price = price
+        exit_date = date
+        return_pct = (exit_price - entry_price) / entry_price * 100
+        trades.append({
+            "Entry Date": entry_date.strftime('%Y-%m-%d %H:%M'),
+            "Exit Date": exit_date.strftime('%Y-%m-%d %H:%M'),
+            "Entry Price": entry_price,
+            "Exit Price": exit_price,
+            "Return [%]": return_pct
+        })
+        in_position = False
+
+# === EVALUATION ===
+if trades:
+    returns = [trade["Return [%]"] for trade in trades]
+    wins = [r for r in returns if r > 0]
+    win_rate = (len(wins) / len(returns)) * 100
+    avg_return = sum(returns) / len(returns)
+    num_trades = len(trades)
+
+    print("\n📊 Evaluation Results (Combined RSI + EMA):")
+    print(f"Number of Trades     : {num_trades}")
+    print(f"Win Rate [%]         : {win_rate:.2f} {'✅' if win_rate > 60 else '❌'}")
+    print(f"Average Return [%]   : {avg_return:.2f} {'✅' if avg_return > 0 else '❌'}")
+else:
+    print("\nNo completed trades to evaluate.")
+
+    # === PLOTTING ===
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+
+# --- PRICE + EMAs + Trade Points ---
+ax1.plot(data.index, prices, label='Close Price', color='blue')
+ax1.plot(data.index, ema_50, label='EMA 50', color='orange')
+ax1.plot(data.index, ema_200, label='EMA 200', color='green')
+
+# Mark Buy/Sell trades
+for trade in trades:
+    entry_idx = data.index.get_loc(pd.to_datetime(trade["Entry Date"]))
+    exit_idx = data.index.get_loc(pd.to_datetime(trade["Exit Date"]))
+    
+    ax1.plot(data.index[entry_idx], prices[entry_idx], marker='^', color='green', markersize=10, label='Buy' if trade == trades[0] else "")
+    ax1.plot(data.index[exit_idx], prices[exit_idx], marker='v', color='red', markersize=10, label='Sell' if trade == trades[0] else "")
+
+ax1.set_title("Price with EMA-50 & EMA-200 + Trade Points")
+ax1.set_ylabel("Price")
+ax1.legend()
+ax1.grid(True)
+
+# --- RSI Plot ---
+ax2.plot(data.index, rsi_values, label='RSI', color='purple')
+ax2.axhline(70, color='red', linestyle='--', linewidth=1)
+ax2.axhline(30, color='green', linestyle='--', linewidth=1)
+ax2.set_title("RSI (14)")
+ax2.set_ylabel("RSI Value")
+ax2.set_xlabel("Date-Time")
+ax2.legend()
+ax2.grid(True)
+
+plt.tight_layout()
+plt.show()
+
+    
+
