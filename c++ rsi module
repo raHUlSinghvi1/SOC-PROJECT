@@ -1,0 +1,70 @@
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <vector>
+#include <string>
+using namespace std;
+
+namespace py = pybind11;
+
+vector<double> computeRSI(const vector<double>& prices, int period=14){
+    vector<double> rsi(prices.size(),0.0);
+
+    if (prices.size() < period){
+        return rsi;
+    }
+    double gain=0.0, loss=0.0;
+
+    // Calculate initial average gain and loss
+    for (int i = 1; i <= period; ++i) {
+        double change = prices[i] - prices[i - 1];
+        if (change > 0)
+            gain += change;
+        else
+            loss -= change;
+    }
+
+    gain /= period;
+    loss /= period;
+
+    double rs = (loss == 0) ? 0 : gain / loss;
+    rsi[period] = 100.0 - (100.0 / (1.0 + rs));
+
+    // Calculate subsequent RSI values
+    for (size_t i = period + 1; i < prices.size(); ++i) {
+        double change = prices[i] - prices[i - 1];
+        double current_gain = (change > 0) ? change : 0.0;
+        double current_loss = (change < 0) ? -change : 0.0;
+
+        gain = ((gain * (period - 1)) + current_gain) / period;
+        loss = ((loss * (period - 1)) + current_loss) / period;
+
+        rs = (loss == 0) ? 0 : gain / loss;
+        rsi[i] = 100.0 - (100.0 / (1.0 + rs));
+    }
+
+    return rsi;
+
+}
+
+// Function to generate signals based on RSI
+vector<string> generateSignals(const vector<double>& rsi, double buy_level = 25.0, double sell_level = 80.0) {
+    vector<string> signals(rsi.size(), "Hold");
+
+    for (size_t i = 0; i < rsi.size(); ++i) {
+        if (rsi[i] < buy_level)
+            signals[i] = "Buy";
+        else if (rsi[i] > sell_level)
+            signals[i] = "Sell";
+    }
+
+    return signals;
+}
+
+// Pybind11 module
+PYBIND11_MODULE(rsi, m) {
+    m.doc() = "RSI and Signal Generator module using Pybind11";
+    m.def("computeRSI", &computeRSI, "Calculate RSI from prices", py::arg("prices"), py::arg("period") = 14);
+    m.def("generateSignals", &generateSignals, "Generate signals from RSI values",
+          py::arg("rsi"), py::arg("buy_level") = 25.0, py::arg("sell_level") = 80.0);
+}
+c
