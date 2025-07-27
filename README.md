@@ -16,3 +16,13 @@ What I Have Learned So Far:
 6. Gained basic understanding of backtesting a strategy to check historical performance.
 
 7. Analyzed and iteratively improved my trading strategy based on performance results.
+
+8. Learnt how machine learning can help in trading.
+
+9. Learned about supervised learning models like Logistic Regression, Decision Trees, and Random Forests.
+
+10. Combining 4-5 technical strategies using ML.
+
+11. Training models to predict buy/sell/hold decisions.
+
+    
