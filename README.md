@@ -17,9 +17,9 @@ What I Have Learned So Far:
 7. Gained basic understanding of backtesting a strategy to check historical performance.
 
 8. Researched more about RSI and incorporated Exponential Moving Average (EMA) into the RSI logic to improve:
-Number of trades
-Win rate
-Average return
+Number of trades,
+Win rate,
+Average return.
 
 9. Analyzed and iteratively improved my trading strategy based on performance results.
 
