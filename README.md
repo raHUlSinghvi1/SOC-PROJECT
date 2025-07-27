@@ -21,8 +21,8 @@ What I Have Learned So Far:
 
 9. Learned about supervised learning models like Logistic Regression, Decision Trees, and Random Forests.
 
-10. Combining 4-5 technical strategies using ML.
+10.Trying to combine 4–5 technical strategies using ML.
 
-11. Training models to predict buy/sell/hold decisions.
+11. Understanding how to train models to predict buy/sell/hold signals.
 
     
